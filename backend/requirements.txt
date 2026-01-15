@@ -1,0 +1,10 @@
+flask
+flask-login
+flask-sqlalchemy
+flask-cors
+psycopg2-binary
+reportlab
+redis
+requests
+pyjwt
+python-nmap

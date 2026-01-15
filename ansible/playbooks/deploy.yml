@@ -1,0 +1,99 @@
+- hosts: vuln_servers
+  become: true
+  vars:
+    app_dir: /opt/vuln-platform-goodyear
+    server_ip: 192.168.253.129
+
+  tasks:
+    - name: Install required packages
+      yum:
+        name:
+          - docker
+          - docker-compose
+          - git
+          - nmap
+        state: present
+
+    - name: Start Docker service
+      systemd:
+        name: docker
+        state: started
+        enabled: yes
+
+    - name: Create application directory
+      file:
+        path: "{{ app_dir }}"
+        state: directory
+        mode: '0755'
+
+    - name: Copy application files
+      synchronize:
+        src: ../../
+        dest: "{{ app_dir }}"
+        rsync_opts:
+          - "--exclude=.git"
+          - "--exclude=node_modules"
+          - "--exclude=__pycache__"
+
+    - name: Set executable permissions
+      file:
+        path: "{{ item }}"
+        mode: '0755'
+      loop:
+        - "{{ app_dir }}/start.sh"
+        - "{{ app_dir }}/scripts/setup.sh"
+
+    - name: Configure firewall for HTTP/HTTPS
+      firewalld:
+        port: "{{ item }}"
+        permanent: yes
+        state: enabled
+        immediate: yes
+      loop:
+        - 8080/tcp
+        - 5000/tcp
+      ignore_errors: yes
+
+    - name: Build Docker containers
+      command: docker-compose build
+      args:
+        chdir: "{{ app_dir }}/docker"
+
+    - name: Start database and redis
+      command: docker-compose up -d db redis
+      args:
+        chdir: "{{ app_dir }}/docker"
+
+    - name: Wait for database to be ready
+      wait_for:
+        timeout: 15
+
+    - name: Start web service
+      command: docker-compose up -d web
+      args:
+        chdir: "{{ app_dir }}/docker"
+
+    - name: Wait for web service
+      wait_for:
+        timeout: 10
+
+    - name: Initialize database
+      command: docker-compose exec -T web python init_db.py
+      args:
+        chdir: "{{ app_dir }}/docker"
+
+    - name: Start frontend and nginx
+      command: docker-compose up -d frontend nginx
+      args:
+        chdir: "{{ app_dir }}/docker"
+
+    - name: Display success message
+      debug:
+        msg:
+          - "==================================="
+          - "Goodyear Vulnerability Platform deployed successfully!"
+          - "==================================="
+          - "Access the platform at: http://{{ server_ip }}:8080"
+          - "Username: admin"
+          - "Password: goodyear123"
+          - "==================================="

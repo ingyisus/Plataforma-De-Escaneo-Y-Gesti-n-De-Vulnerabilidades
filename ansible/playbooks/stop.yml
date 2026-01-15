@@ -1,0 +1,14 @@
+- hosts: vuln_servers
+  become: true
+  vars:
+    app_dir: /opt/vuln-platform-goodyear
+
+  tasks:
+    - name: Stop all containers
+      command: docker-compose down
+      args:
+        chdir: "{{ app_dir }}/docker"
+
+    - name: Display message
+      debug:
+        msg: "All services stopped successfully"

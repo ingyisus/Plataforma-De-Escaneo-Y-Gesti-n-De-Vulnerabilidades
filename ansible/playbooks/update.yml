@@ -1,0 +1,31 @@
+- hosts: vuln_servers
+  become: true
+  vars:
+    app_dir: /opt/vuln-platform-goodyear
+
+  tasks:
+    - name: Pull latest changes
+      git:
+        repo: "{{ git_repo }}"
+        dest: "{{ app_dir }}"
+        force: yes
+      when: git_repo is defined
+
+    - name: Stop containers
+      command: docker-compose down
+      args:
+        chdir: "{{ app_dir }}/docker"
+
+    - name: Rebuild containers
+      command: docker-compose build
+      args:
+        chdir: "{{ app_dir }}/docker"
+
+    - name: Start services
+      command: docker-compose up -d
+      args:
+        chdir: "{{ app_dir }}/docker"
+
+    - name: Display message
+      debug:
+        msg: "Application updated and restarted successfully"
